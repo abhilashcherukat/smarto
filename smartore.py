@@ -1,13 +1,16 @@
 __author__ = 'Abhilash'
 
-
-__author__ = 'Abhilash'
-
 import json
 import web
 import MySQLdb
 import collections
+import smtplib
+import sys
+import linecache
 
+from datetime import datetime
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 urls = (
     '/', 'index',
@@ -21,7 +24,7 @@ urls = (
 
 #Local
 
-db = web.database(dbn='mysql', user='usr_smartmeter', pw='pPh4j7ZCHdTrX6SA', db='smartmeter')
+db = web.database(dbn='mysql', user='root', pw='', db='smartmeter')
 
 
 
@@ -33,11 +36,81 @@ class CommonFunctions():
         web.header('Access-Control-Allow-Headers', '*')
         web.header('Content-Type', 'application/json')
         return  json.dumps(status)
+    def LogError(self, message, APICall, LineNo):
+        try:
+            now = datetime.now()
+            date = str(now.year)+"-"+str(now.month)+"-"+str(now.day)+" "
+            time = str(now.hour)+":"+str(now.minute)+":"+str(now.second)
+            entries = db.insert('errorLog', time=date+time,API=APICall,lineNumber=LineNo,details=str(message))
+        except:
+            pass
+    def PrintException(self,API):
+        try:
+            exc_type, exc_obj, tb = sys.exc_info()
+            f = tb.tb_frame
+            lineno = tb.tb_lineno
+            filename = f.f_code.co_filename
+            linecache.checkcache(filename)
+            print exc_obj
+            line = linecache.getline(filename, lineno, f.f_globals)
+            linepart=line.strip()
+            #linePart="".join(linePart)
+            msg=str(exc_obj)+"[" + linepart + "...]"
+            return self.LogError(msg,API,lineno)#
+        except:
+            pass
+    def SendMail(self, To, From, Subject, Html,Plain):
+        try:
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = Subject
+            msg['From'] = From
+            msg['To'] = To
+            part1 = MIMEText(Plain, 'plain',"utf-8")
+            part2 = MIMEText(Html, 'html')
+            msg.attach(part1)
+            msg.attach(part2)
+            # Send the message via local SMTP server.
+            #mail = smtplib.SMTP('smtp.gmail.com', 587)
+            mail = smtplib.SMTP('smtp.gmail.com', 587)
+            mail.ehlo()
+            mail.starttls()
+            mail.login('abhilash.c@spurtreetech.com', 'Ab4i7@$h')
+            mail.sendmail(From,To, msg.as_string())
+            mail.quit()
+            status = {"status": "Sucess", "message": "Mail Sent","statusCode":200,"MailSent":True}
+            web.header('Access-Control-Allow-Origin', '*')
+            web.header('Access-Control-Allow-Methods', '*')
+            web.header('Access-Control-Allow-Headers', '*')
+            web.header('Content-Type', 'application/json')
+            return  json.dumps(status)
+        except smtplib.SMTPAuthenticationError:
+            self.PrintException("Mail Sent Function")
+            status = {"status": "Error", "message": "Authentication Error","statusCode":500,"MailSent":False}
+            web.header('Access-Control-Allow-Origin', '*')
+            web.header('Access-Control-Allow-Methods', '*')
+            web.header('Access-Control-Allow-Headers', '*')
+            web.header('Content-Type', 'application/json')
+            return  json.dumps(status)
+
+        except Exception as e:
+            self.PrintException("Mail Sent Function")
+            status = {"status": "Error", "message": "Error Try Later","statusCode":str(e)}
+            web.header('Access-Control-Allow-Origin', '*')
+            web.header('Access-Control-Allow-Methods', '*')
+            web.header('Access-Control-Allow-Headers', '*')
+            web.header('Content-Type', 'application/json')
+            return  json.dumps(status)
 
 class index:
     def GET(self):
         ComFnObj=CommonFunctions()
-        return ComFnObj.NullFunction();
+        try:
+            k=0/0;
+        except Exception as e:
+            ComFnObj.PrintException("Index");
+            return "This is an exception"
+        else:
+            return ComFnObj.NullFunction();
 
 class checkregistration:
     def POST(self):
